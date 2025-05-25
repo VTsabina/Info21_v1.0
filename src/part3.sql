@@ -72,7 +72,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- SELECT * FROM xp_per_task()
+-- SELECT * FROM xp_per_task();
 
 
 ------------------------------------------------------------------------------------------------------
@@ -99,11 +99,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- SELECT * FROM no_exits('01/01/2024')
+-- SELECT * FROM no_exits('01/01/2024');
 
 -- INSERT INTO TimeTracking VALUES ((SELECT COALESCE(MAX(ID), 0) + 1 FROM TimeTracking), 'gttngqbwgs', '01/01/2024', '11:34:46', '1');
 -- INSERT INTO TimeTracking VALUES ((SELECT COALESCE(MAX(ID), 0) + 1 FROM TimeTracking), 'gttngqbwgs', '01/01/2024', '11:34:46', '2');
--- SELECT * FROM TimeTracking WHERE Date = '01/01/2024'
+-- SELECT * FROM TimeTracking WHERE Date = '01/01/2024';
 
 
 ------------------------------------------------------------------------------------------------------

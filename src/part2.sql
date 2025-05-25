@@ -2,6 +2,13 @@
 --                                            TASK 1                                                --
 ------------------------------------------------------------------------------------------------------
 
+-- 1) Напиши процедуру добавления P2P-проверки
+
+-- Параметры: ник проверяемого, ник проверяющего, название задания, [статус P2P-проверки](#статус-проверки), время. \
+-- Если задан статус «начало», добавь запись в таблицу Checks (в качестве даты используй сегодняшнюю). \
+-- Добавь запись в таблицу P2P. \
+-- Если задан статус «начало», в качестве проверки укажи только что добавленную запись, если же нет, то укажи проверку с незавершенным P2P-этапом.
+
 CREATE OR REPLACE PROCEDURE p2p_check(
     checked_peer VARCHAR,
     checking_peer VARCHAR,
@@ -61,9 +68,26 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- CALL p2p_check ('qeunlyykzb', 'mvazvelhwy', 'C5', '0', '06:39:35');
+-- CALL p2p_check ('qeunlyykzb', 'mvazvelhwy', 'C5', '1', '06:39:35');
+
+-- DROP PROCEDURE p2p_check(
+--     checked_peer VARCHAR,
+--     checking_peer VARCHAR,
+--     task_name VARCHAR,
+--     p2p_status VARCHAR,
+--     check_time DATE
+-- );
+
+
 ------------------------------------------------------------------------------------------------------
 --                                            TASK 2                                                --
 ------------------------------------------------------------------------------------------------------
+
+-- 2) Напиши процедуру добавления проверки Verter'ом
+
+-- Параметры: ник проверяемого, название задания, [статус проверки Verter'ом](#статус-проверки), время. \
+-- Добавь запись в таблицу Verter (в качестве проверки укажи проверку соответствующего задания с самым поздним (по времени) успешным P2P-этапом).
 
 CREATE OR REPLACE PROCEDURE add_verter_check(
     checked_peer VARCHAR,
@@ -93,7 +117,7 @@ BEGIN
           WHERE p2.Checkslot = p.Checkslot 
           AND p2.State = '2'::Review_status
       )
-    ORDER BY p.Time DESC
+    ORDER BY c.Date DESC
     LIMIT 1;
     
     IF successful_check_id IS NULL THEN
@@ -111,59 +135,142 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- CREATE OR REPLACE FUNCTION update_transferred_points()
--- RETURNS TRIGGER AS $$
--- BEGIN
---     -- Only act on 'Start' records
---     IF NEW.State = 'Start'::Review_status THEN
---         -- Check if record already exists
---         IF EXISTS (
---             SELECT 1 FROM TransferredPoints 
---             WHERE CheckingPeer = NEW.CheckingPeer 
---             AND CheckedPeer = (
---                 SELECT Peer FROM Checks WHERE ID = NEW.Checkslot
---             )
---         ) THEN
---             -- Update existing record
---             UPDATE TransferredPoints
---             SET PointsAmount = PointsAmount + 1
---             WHERE CheckingPeer = NEW.CheckingPeer
---             AND CheckedPeer = (SELECT Peer FROM Checks WHERE ID = NEW.Checkslot);
---         ELSE
---             -- Insert new record
---             INSERT INTO TransferredPoints (CheckingPeer, CheckedPeer, PointsAmount)
---             SELECT NEW.CheckingPeer, c.Peer, 1
---             FROM Checks c
---             WHERE c.ID = NEW.Checkslot;
---         END IF;
---     END IF;
-    
---     RETURN NEW;
--- END;
--- $$ LANGUAGE plpgsql;
-
--- CREATE TRIGGER trg_p2p_transferred_points
--- AFTER INSERT ON P2P
--- FOR EACH ROW
--- EXECUTE FUNCTION update_transferred_points();
-
--- -- DROP TRIGGER check_time_trigger ON timetracking
-
--- CALL p2p_check ('qeunlyykzb', 'mvazvelhwy', 'C5', '1', '06:39:35')
-
+-- CALL add_verter_check ('qeunlyykzb', 'C5', '0', '06:47:35');
 -- CALL add_verter_check ('qeunlyykzb', 'C5', '1', '06:47:35');
+-- CALL add_verter_check ('iosfiypdje', 'A3', '0', '15:47:35');
+-- CALL add_verter_check ('iosfiypdje', 'A3', '1', '16:47:35');
 
--- SELECT * FROM p2p
 
--- DROP PROCEDURE p2p_check(
+-- DROP PROCEDURE add_verter_check(
 --     checked_peer VARCHAR,
---     checking_peer VARCHAR,
 --     task_name VARCHAR,
---     p2p_status VARCHAR,
---     check_time DATE
--- )
+--     verter_status VARCHAR,
+--     check_time TIME
+-- );
 
--- SELECT * FROM P2P
--- LEFT JOIN Verter
--- ON P2P.Checkslot = Verter.Checkslot
--- WHERE P2P.State = '1' AND P2P.Checkslot = 11861
+------------------------------------------------------------------------------------------------------
+--                                            TASK 3                                                --
+------------------------------------------------------------------------------------------------------
+
+-- 3) Напиши триггер: после добавления записи со статусом «начало» в таблицу P2P изменяется соответствующая запись в таблице TransferredPoints
+
+CREATE OR REPLACE FUNCTION update_transferred_points()
+RETURNS TRIGGER AS $$
+DECLARE 
+	new_id INTEGER;
+BEGIN
+    -- Only act on 'Start' records
+    IF NEW.State = '0'::Review_status THEN
+        -- Check if record already exists
+        IF EXISTS (
+            SELECT 1 FROM Transferred_Points 
+            WHERE CheckingPeer = NEW.CheckingPeer 
+            AND CheckedPeer = (
+                SELECT Peer FROM Checks WHERE ID = NEW.Checkslot
+            )
+        ) THEN
+            -- Update existing record
+            UPDATE Transferred_Points
+            SET PointsAmount = PointsAmount + 1
+            WHERE CheckingPeer = NEW.CheckingPeer
+            AND CheckedPeer = (SELECT Peer FROM Checks WHERE ID = NEW.Checkslot);
+        ELSE
+            -- Insert new record
+			SELECT COALESCE(MAX(ID), 0) + 1 INTO new_id FROM Transferred_Points;
+            INSERT INTO Transferred_Points (id, CheckingPeer, CheckedPeer, PointsAmount)
+            SELECT new_id, NEW.CheckingPeer, c.Peer, 1
+            FROM Checks c
+            WHERE c.ID = NEW.Checkslot;
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_p2p_transferred_points
+AFTER INSERT ON P2P
+FOR EACH ROW
+EXECUTE FUNCTION update_transferred_points();
+
+-- CALL p2p_check ('iosfiypdje', 'mvazvelhwy', 'A3', '0', '17:23:30');
+-- CALL p2p_check ('iosfiypdje', 'mvazvelhwy', 'A3', '1', '17:23:30');
+
+-- CALL p2p_check ('wsiwgwornx', 'prbedzugjq', 'A3', '0', '17:23:30');
+-- CALL p2p_check ('wsiwgwornx', 'prbedzugjq', 'A3', '1', '17:23:30');
+
+-- CALL p2p_check ('gdlzzcthpd', 'thyrtwnsgs', 'A3', '0', '17:23:30');
+-- CALL p2p_check ('gdlzzcthpd', 'thyrtwnsgs', 'A3', '1', '17:23:30');
+
+-- SELECT * FROM transferred_points
+-- ORDER BY 1;
+
+-- DROP TRIGGER trg_p2p_transferred_points ON P2P;
+
+
+------------------------------------------------------------------------------------------------------
+--                                            TASK 4                                                --
+------------------------------------------------------------------------------------------------------
+
+-- 4) Напиши триггер: перед добавлением записи в таблицу XP проверяется корректность добавляемой записи
+
+-- Запись считается корректной, если:
+-- - Количество XP не превышает максимальное доступное для проверяемой задачи.
+-- - Поле Check ссылается на успешную проверку.
+-- Если запись не прошла проверку, не добавляй её в таблицу.
+
+CREATE OR REPLACE FUNCTION validate_xp()
+RETURNS TRIGGER AS $$
+DECLARE
+    max_xp INTEGER;
+    check_status VARCHAR;
+BEGIN
+    -- Get max XP for the task and check if the check was successful
+    SELECT t.MaxXP, 
+           CASE WHEN EXISTS (
+               SELECT 1 FROM P2P p 
+               WHERE p.Checkslot = NEW.Checkslot 
+               AND p.State = '1'::Review_status
+               AND NOT EXISTS (
+                   SELECT 1 FROM P2P p2 
+                   WHERE p2.Checkslot = p.Checkslot 
+                   AND p2.State = '2'::Review_status
+               )
+               AND NOT EXISTS (
+                   SELECT 1 FROM Verter v 
+                   WHERE v.Checkslot = p.Checkslot 
+                   AND v.State = '2'::Review_status
+               )
+           ) AND NOT EXISTS (
+               SELECT 1 FROM Verter v 
+               WHERE v.Checkslot = NEW.Checkslot 
+               AND v.State = '2'::Review_status
+           ) THEN '1' ELSE '2' END
+    INTO max_xp, check_status
+    FROM Checks c
+    JOIN Tasks t ON c.Task = t.Title
+    WHERE c.ID = NEW.Checkslot;
+    
+    -- Validate XP amount
+    IF NEW.XPAmmount > max_xp THEN
+        RAISE EXCEPTION 'XP amount % exceeds maximum % for this task', NEW.XPAmmount, max_xp;
+    END IF;
+    
+    -- Validate check status
+    IF check_status != '1' THEN
+        RAISE EXCEPTION 'Cannot add XP for unsuccessful check (ID: %)', NEW.Checkslot;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validate_xp
+BEFORE INSERT ON XP
+FOR EACH ROW
+EXECUTE FUNCTION validate_xp();
+
+-- INSERT INTO XP VALUES(2451, 13932, 400); -- Too much XP
+-- CALL p2p_check ('dnafdfodeq', 'wbbmjueeye', 'A1', '0', '18:23:30');
+-- CALL p2p_check ('dnafdfodeq', 'wbbmjueeye', 'A1', '2', '20:23:30');
+-- INSERT INTO XP VALUES(2452, 13933, 400); -- Failed check

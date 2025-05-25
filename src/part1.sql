@@ -206,9 +206,9 @@ DECLARE
     col INTEGER;
 BEGIN
     SELECT COUNT(ID) INTO col FROM Verter WHERE Checkslot = NEW.Checkslot;
-    IF col >= 2 THEN
+    IF col >= 2 AND col % 2 = 0 AND NEW.State != '0' THEN
 		RAISE EXCEPTION 'This check has already been completed';
-	ELSIF col = 1 THEN
+	ELSIF col % 2 != 0 THEN
 		IF NEW.State not in ('1', '2') THEN
 			RAISE EXCEPTION 'This check has already started';
 		END IF;
