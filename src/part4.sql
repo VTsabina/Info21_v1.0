@@ -366,6 +366,10 @@ BEGIN
 		JOIN pg_namespace n ON p.pronamespace = n.oid
 		WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
 		  AND (p.prokind = 'f' OR p.prokind = 'p')
+		  AND ((pg_get_function_result(p.oid) NOT LIKE 'SETOF %'
+          AND pg_get_function_result(p.oid) NOT LIKE 'TABLE(%'
+		  AND pg_get_function_result(p.oid) NOT LIKE '%trigger%')
+		  OR pg_get_function_result(p.oid) IS NULL)
 	LOOP
 		SELECT pg_get_functiondef(rec.oid) INTO func_def;
 		IF func_def LIKE '%' || pattern || '%' THEN

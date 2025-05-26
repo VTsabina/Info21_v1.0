@@ -137,8 +137,6 @@ $$ LANGUAGE plpgsql;
 
 -- CALL add_verter_check ('qeunlyykzb', 'C5', '0', '06:47:35');
 -- CALL add_verter_check ('qeunlyykzb', 'C5', '1', '06:47:35');
--- CALL add_verter_check ('iosfiypdje', 'A3', '0', '15:47:35');
--- CALL add_verter_check ('iosfiypdje', 'A3', '1', '16:47:35');
 
 
 -- DROP PROCEDURE add_verter_check(

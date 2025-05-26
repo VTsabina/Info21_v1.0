@@ -22,14 +22,27 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
 	RETURN QUERY
-	SELECT checkingpeer,
-		   checkedpeer,
-		   pointsamount
-	FROM Transferred_Points;	   
+    WITH sorted AS (
+		SELECT
+			CASE WHEN CheckingPeer < CheckedPeer 
+		           THEN CheckedPeer 
+		           ELSE CheckingPeer END AS Peer1,
+			CASE WHEN CheckingPeer < CheckedPeer 
+		           THEN CheckingPeer 
+		           ELSE CheckedPeer END AS Peer2,
+			CASE WHEN CheckingPeer < CheckedPeer 
+		           THEN -PointsAmount 
+		           ELSE PointsAmount END
+		FROM Transferred_Points
+	)
+	SELECT Peer1, Peer2, CAST(SUM(PointsAmount) AS INTEGER) 
+	FROM sorted
+	GROUP BY 1, 2;   
 END;
 $$ LANGUAGE plpgsql;
 
--- SELECT * FROM print_points();
+-- SELECT * FROM print_points() ORDER BY 3;
+-- DROP FUNCTION print_points();
 
 
 ------------------------------------------------------------------------------------------------------
@@ -101,9 +114,9 @@ $$ LANGUAGE plpgsql;
 
 -- SELECT * FROM no_exits('01/01/2024');
 
--- INSERT INTO TimeTracking VALUES ((SELECT COALESCE(MAX(ID), 0) + 1 FROM TimeTracking), 'gttngqbwgs', '01/01/2024', '11:34:46', '1');
--- INSERT INTO TimeTracking VALUES ((SELECT COALESCE(MAX(ID), 0) + 1 FROM TimeTracking), 'gttngqbwgs', '01/01/2024', '11:34:46', '2');
--- SELECT * FROM TimeTracking WHERE Date = '01/01/2024';
+-- INSERT INTO Time_Tracking VALUES ((SELECT COALESCE(MAX(ID), 0) + 1 FROM Time_Tracking), 'gttngqbwgs', '01/01/2024', '11:34:46', '1');
+-- INSERT INTO Time_Tracking VALUES ((SELECT COALESCE(MAX(ID), 0) + 1 FROM Time_Tracking), 'gttngqbwgs', '01/01/2024', '11:34:46', '2');
+-- SELECT * FROM Time_Tracking WHERE Date = '01/01/2024';
 
 
 ------------------------------------------------------------------------------------------------------
@@ -129,11 +142,27 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
 	RETURN QUERY
-	SELECT checkingpeer AS "Peer", 
-		   SUM(pointsamount) AS "PointsChange"
-	FROM Transferred_Points
-	GROUP BY checkingpeer
-	ORDER BY 2 DESC;
+	WITH sorted AS (
+			SELECT
+				CASE WHEN CheckingPeer < CheckedPeer 
+					   THEN CheckedPeer 
+					   ELSE CheckingPeer END AS Peer1,
+				CASE WHEN CheckingPeer < CheckedPeer 
+					   THEN CheckingPeer 
+					   ELSE CheckedPeer END AS Peer2,
+				CASE WHEN CheckingPeer < CheckedPeer 
+					   THEN -PointsAmount 
+					   ELSE PointsAmount END
+			FROM Transferred_Points
+		)
+		SELECT tmp.Peer, SUM(PointsAmount)
+		FROM (
+		    SELECT Peer1 AS Peer, PointsAmount FROM sorted
+		    UNION ALL
+		    SELECT Peer2 AS Peer, -PointsAmount FROM sorted
+		) AS tmp
+		GROUP BY 1
+		ORDER BY 2 DESC;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -164,10 +193,13 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
 	RETURN QUERY
-	SELECT "Peer1" AS "Peer", 
-		   SUM("PointsAmount") AS "PointsChange"
-	FROM print_points()
-	GROUP BY "Peer1"
+	SELECT tmp."Peer", SUM("PointsAmount")::BIGINT
+	FROM (
+    SELECT "Peer1" AS "Peer", "PointsAmount" FROM print_points()
+    UNION ALL
+    SELECT "Peer2" AS "Peer", -"PointsAmount" FROM print_points()
+	) AS tmp
+	GROUP BY 1
 	ORDER BY 2 DESC;
 END;
 $$ LANGUAGE plpgsql;
@@ -750,7 +782,7 @@ $$ LANGUAGE plpgsql;
 -- 									(20618, 'pgxntxjwge', '19/05/2025', '04:55:34', 1),
 -- 									(20619, 'pgxntxjwge', '19/05/2025', '15:48:44', 2);
 
--- SELECT * FROM more_exits(7, 1);
+-- SELECT * FROM more_exits(12, 1);
 -- DROP FUNCTION more_exits(N INTEGER, M INTEGER);
 
 
